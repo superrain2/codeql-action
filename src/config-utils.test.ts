@@ -158,6 +158,37 @@ test("load non-empty input", async t => {
   });
 });
 
+test("Queries can be overridden in action file", async t => {
+  return await util.withTmpDir(async tmpDir => {
+    process.env['RUNNER_TEMP'] = tmpDir;
+    process.env['GITHUB_WORKSPACE'] = tmpDir;
+
+    const inputFileContents = `
+      name: my config
+      queries:
+        - uses: ./foo`;
+
+    fs.mkdirSync(path.join(tmpDir, 'foo'));
+    fs.mkdirSync(path.join(tmpDir, 'override'));
+
+    // this config item should take precedence
+    setInput('queries', './override');
+
+    // And the config we expect it to parse to
+    const expectedConfig = new configUtils.Config();
+    expectedConfig.name = 'my config';
+    expectedConfig.additionalQueries.push(fs.realpathSync(path.join(tmpDir, 'override')));
+
+    fs.writeFileSync(path.join(tmpDir, 'input'), inputFileContents, 'utf8');
+    setInput('config-file', 'input');
+
+    const actualConfig = await configUtils.loadConfig();
+
+    // Should exactly equal the object we constructed earlier
+    t.deepEqual(actualConfig, expectedConfig);
+  });
+});
+
 test("API client used when reading remote config", async t => {
   return await util.withTmpDir(async tmpDir => {
     process.env['RUNNER_TEMP'] = tmpDir;
